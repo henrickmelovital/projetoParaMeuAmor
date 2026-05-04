@@ -10,32 +10,35 @@
     body {
       margin: 0;
       overflow: hidden;
-      background: linear-gradient(135deg, #ffafbd 0%, #ffc3a0 100%);
+      background: #000; /* Fundo preto inicial para o foguete aparecer */
       display: flex;
       justify-content: center;
       align-items: center;
       height: 100vh;
       font-family: 'Quicksand', sans-serif;
-      perspective: 1000px;
+      transition: background 2s ease;
     }
 
-    /* Cartão interativo com efeito 3D ao passar o mouse */
+    /* Estilo do Cartão (começa invisível) */
     .card {
       text-align: center;
       z-index: 10;
-      background: rgba(255, 255, 255, 0.25);
+      background: rgba(255, 255, 255, 0.2);
       padding: 50px;
       border-radius: 40px;
       backdrop-filter: blur(15px);
-      box-shadow: 0 20px 50px rgba(0, 0, 0, 0.1);
-      border: 1px solid rgba(255, 255, 255, 0.4);
-      transition: all 0.5s cubic-bezier(0.23, 1, 0.32, 1);
-      transform-style: preserve-3d;
+      box-shadow: 0 20px 50px rgba(0, 0, 0, 0.2);
+      border: 1px solid rgba(255, 255, 255, 0.3);
+      opacity: 0;
+      transform: scale(0.8);
+      transition: all 1s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+      pointer-events: none;
     }
 
-    .card:hover {
-      transform: rotateY(10deg) rotateX(5deg) scale(1.02);
-      box-shadow: 0 30px 60px rgba(255, 77, 109, 0.2);
+    .card.visible {
+      opacity: 1;
+      transform: scale(1);
+      pointer-events: auto;
     }
 
     h1 {
@@ -43,159 +46,199 @@
       font-family: 'Dancing Script', cursive;
       font-size: 4.5rem;
       margin: 0;
-      filter: drop-shadow(0 5px 15px rgba(255, 77, 109, 0.4));
-      animation: floatText 3s ease-in-out infinite;
+      filter: drop-shadow(0 5px 15px rgba(255, 77, 109, 0.6));
     }
 
-    .message {
-      color: #fff;
-      font-size: 1.1rem;
-      margin-top: 20px;
-      opacity: 0.9;
-      letter-spacing: 2px;
-      text-transform: uppercase;
-    }
-
-    /* Estilo dos elementos flutuantes */
-    .particle {
+    /* Canvas para os fogos */
+    #canvas {
       position: absolute;
-      pointer-events: none;
-      z-index: 1;
-      animation: moveUp linear forwards;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      z-index: 5;
     }
 
-    @keyframes moveUp {
-      0% { transform: translateY(110vh) rotate(0deg) scale(0); opacity: 0; }
-      20% { opacity: 1; transform: translateY(80vh) rotate(90deg) scale(1.2); }
-      100% { transform: translateY(-20vh) rotate(720deg) scale(0.5); opacity: 0; }
-    }
-
-    @keyframes floatText {
-      0%, 100% { transform: translateY(0); }
-      50% { transform: translateY(-15px); }
-    }
-
-    /* Botão de Música */
     .music-control {
       position: fixed;
-      bottom: 30px;
-      right: 30px;
-      background: rgba(255, 255, 255, 0.8);
+      bottom: 20px;
+      right: 20px;
+      z-index: 100;
+      background: rgba(255, 255, 255, 0.3);
       border: none;
       border-radius: 50%;
-      width: 50px;
-      height: 50px;
+      width: 40px;
+      height: 40px;
       cursor: pointer;
-      z-index: 100;
-      box-shadow: 0 5px 15px rgba(0,0,0,0.1);
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      font-size: 1.5rem;
-      transition: 0.3s;
+      color: white;
     }
-
-    .music-control:hover { transform: scale(1.1); }
   </style>
 </head>
-<body onmousemove="spawnTrail(event)">
+<body>
 
-  <!-- Opcional: Link de uma música fofa (Lofi ou Instrumental) -->
-  <audio id="bgMusic" loop>
-    <source src="https://www.bensound.com/bensound-music/bensound-love.mp3" type="audio/mpeg">
-  </audio>
+  <canvas id="canvas"></canvas>
 
-  <button class="music-control" onclick="toggleMusic()">🎵</button>
-
-  <div class="card" onclick="explosion(event)">
-    <h1 id="title">Para Thainá</h1>
-    <div class="message">Você é o meu melhor presente</div>
-    <p style="color: white; font-weight: 300; margin-top: 30px;">(Toque na tela)</p>
+  <div class="card" id="mainCard">
+    <h1>Eu te amo, Thainá ❤️</h1>
+    <p style="color: white; opacity: 0.8;">Você faz meu mundo brilhar</p>
   </div>
 
   <script>
-    const colors = ["#FF4D6D", "#FF758F", "#FF8FA3", "#FFB3C1", "#FFCCD5"];
-    const emojis = ["❤️", "💖", "✨", "🌸", "☁️", "💍"];
+    const canvas = document.getElementById('canvas');
+    const ctx = canvas.getContext('2d');
+    let particles = [];
 
-    // 1. Criação automática de partículas ao fundo
-    function createParticle() {
-      const p = document.createElement("div");
-      p.className = "particle";
-      p.innerText = emojis[Math.floor(Math.random() * emojis.length)];
-      p.style.left = Math.random() * 100 + "vw";
-      p.style.fontSize = Math.random() * 20 + 10 + "px";
-      p.style.animationDuration = Math.random() * 5 + 5 + "s";
-      p.style.color = colors[Math.floor(Math.random() * colors.length)];
+    // Ajusta tamanho do canvas
+    function resize() {
+      canvas.width = window.innerWidth;
+      canvas.height = window.innerHeight;
+    }
+    window.addEventListener('resize', resize);
+    resize();
+
+    // Classe da Partícula do Fogete/Explosão
+    class Particle {
+      constructor(x, y, color, velocity, isHeart = false) {
+        this.x = x;
+        this.y = y;
+        this.color = color;
+        this.velocity = velocity;
+        this.alpha = 1;
+        this.friction = 0.96;
+        this.gravity = 0.15;
+        this.isHeart = isHeart;
+      }
+
+      draw() {
+        ctx.save();
+        ctx.globalAlpha = this.alpha;
+        ctx.beginPath();
+        ctx.arc(this.x, this.y, 2, 0, Math.PI * 2);
+        ctx.fillStyle = this.color;
+        ctx.fill();
+        ctx.restore();
+      }
+
+      update() {
+        this.velocity.x *= this.friction;
+        this.velocity.y *= this.friction;
+        this.velocity.y += this.gravity;
+        this.x += this.velocity.x;
+        this.y += this.velocity.y;
+        this.alpha -= 0.01;
+      }
+    }
+
+    // Função para desenhar o formato de coração matemático
+    function getHeartPoint(t) {
+      const x = 16 * Math.sin(t) ** 3;
+      const y = -(13 * Math.cos(t) - 5 * Math.cos(2 * t) - 2 * Math.cos(3 * t) - Math.cos(4 * t));
+      return { x, y };
+    }
+
+    // Sequência da Animação
+    function launchRocket() {
+      const x = canvas.width / 2;
+      let y = canvas.height;
+      const targetY = canvas.height * 0.4;
+
+      function animateLaunch() {
+        ctx.fillStyle = 'rgba(0, 0, 0, 0.2)';
+        ctx.fillRect(0, 0, canvas.width, canvas.height);
+        
+        ctx.beginPath();
+        ctx.arc(x, y, 3, 0, Math.PI * 2);
+        ctx.fillStyle = '#ff4d6d';
+        ctx.fill();
+
+        y -= 8;
+
+        if (y > targetY) {
+          requestAnimationFrame(animateLaunch);
+        } else {
+          explodeHeart(x, y);
+        }
+      }
+      animateLaunch();
+    }
+
+    function explodeHeart(x, y) {
+      // Cria partículas no formato de coração
+      for (let i = 0; i < Math.PI * 2; i += 0.1) {
+        const point = getHeartPoint(i);
+        const velocity = {
+          x: point.x * 0.5,
+          y: point.y * 0.5
+        };
+        particles.push(new Particle(x, y, '#ff4d6d', velocity));
+      }
+
+      // Adiciona brilhos extras
+      for (let i = 0; i < 50; i++) {
+        particles.push(new Particle(x, y, '#fff', {
+          x: (Math.random() - 0.5) * 15,
+          y: (Math.random() - 0.5) * 15
+        }));
+      }
+
+      animateExplosion();
       
-      document.body.appendChild(p);
-      setTimeout(() => p.remove(), 10000);
-    }
-    setInterval(createParticle, 300);
-
-    // 2. Efeito de rastro que segue o mouse
-    function spawnTrail(e) {
-      if (Math.random() > 0.8) { // Não criar sempre para não pesar
-        const dot = document.createElement("div");
-        dot.className = "particle";
-        dot.innerText = "✨";
-        dot.style.left = e.pageX + "px";
-        dot.style.top = e.pageY + "px";
-        dot.style.fontSize = "10px";
-        dot.style.animation = "fadeAway 1s forwards";
-        document.body.appendChild(dot);
-        setTimeout(() => dot.remove(), 1000);
-      }
+      // Muda o fundo e mostra o card após a explosão
+      setTimeout(() => {
+        document.body.style.background = 'linear-gradient(135deg, #ffafbd 0%, #ffc3a0 100%)';
+        document.getElementById('mainCard').classList.add('visible');
+      }, 500);
     }
 
-    // 3. Explosão de corações ao clicar
-    function explosion(e) {
-      for(let i=0; i<20; i++) {
-        const p = document.createElement("div");
-        p.className = "particle";
-        p.innerText = "❤️";
-        p.style.left = e.pageX + "px";
-        p.style.top = e.pageY + "px";
-        p.style.transition = "all 1s ease-out";
-        
-        document.body.appendChild(p);
-        
-        // Direção aleatória da explosão
-        const destX = (Math.random() - 0.5) * 500;
-        const destY = (Math.random() - 0.5) * 500;
-        
-        requestAnimationFrame(() => {
-          p.style.transform = `translate(${destX}px, ${destY}px) scale(0) rotate(360deg)`;
-          p.style.opacity = "0";
-        });
+    function animateExplosion() {
+      ctx.fillStyle = 'rgba(0, 0, 0, 0.1)';
+      ctx.fillRect(0, 0, canvas.width, canvas.height);
 
-        setTimeout(() => p.remove(), 1000);
-      }
-    }
+      particles.forEach((p, i) => {
+        if (p.alpha > 0) {
+          p.update();
+          p.draw();
+        } else {
+          particles.splice(i, 1);
+        }
+      });
 
-    // 4. Controle de música
-    let playing = false;
-    function toggleMusic() {
-      const audio = document.getElementById("bgMusic");
-      const btn = document.querySelector(".music-control");
-      if (!playing) {
-        audio.play().catch(() => alert("Clique na tela primeiro para tocar a música!"));
-        btn.innerText = "⏸️";
+      if (particles.length > 0) {
+        requestAnimationFrame(animateExplosion);
       } else {
-        audio.pause();
-        btn.innerText = "🎵";
+        // Limpa o canvas para os efeitos de flutuação normais começarem
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
+        startFloatingHearts();
       }
-      playing = !playing;
     }
 
-    // Adiciona animação extra de fadeAway para o rastro
-    const style = document.createElement('style');
-    style.innerHTML = `
-      @keyframes fadeAway {
-        0% { opacity: 1; transform: scale(1); }
-        100% { opacity: 0; transform: scale(3) translateY(-20px); }
-      }
-    `;
-    document.head.appendChild(style);
+    // Corações flutuantes que você já tinha
+    function startFloatingHearts() {
+        setInterval(() => {
+            const p = document.createElement("div");
+            p.style.position = "fixed";
+            p.style.bottom = "-20px";
+            p.style.left = Math.random() * 100 + "vw";
+            p.innerText = "❤️";
+            p.style.fontSize = "20px";
+            p.style.transition = "transform 5s linear, opacity 5s";
+            p.style.pointerEvents = "none";
+            p.style.zIndex = "1";
+            document.body.appendChild(p);
+
+            setTimeout(() => {
+                p.style.transform = `translateY(-110vh) rotate(${Math.random() * 360}deg)`;
+                p.style.opacity = "0";
+            }, 100);
+
+            setTimeout(() => p.remove(), 6000);
+        }, 400);
+    }
+
+    // Inicia tudo
+    window.onload = () => {
+      setTimeout(launchRocket, 1000);
+    };
   </script>
 </body>
 </html>
